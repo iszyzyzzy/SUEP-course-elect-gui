@@ -138,26 +138,34 @@ def elect_course(course_id: str, e_id: str) -> list:
 
 def parse_courses_exp(exp: str, e_id: str) -> list:
     if ';' in exp:
-        return [parse_courses_exp(i, e_id) for i in exp.split(';')]
+        result = None
+        for i in exp.split(';'):
+            result = parse_courses_exp(i, e_id)
+        return result
     if '|' in exp:
+        result = None
         for i in exp.split('|'):
-            expr, msg, succeeded, retry = parse_courses_exp(i, e_id)
-            if succeeded:
-                return [expr, msg, succeeded, retry]
-        return [exp, msg, succeeded, retry]
+            result = parse_courses_exp(i, e_id)
+            if result[2]:
+                return result
+        return result
     if '&' in exp:
+        result = None
         for i in exp.split('&'):
-            expr, msg, succeeded, retry = parse_courses_exp(i, e_id)
-            if not succeeded:
-                return [expr, msg, succeeded, retry]
-        return [exp, msg, succeeded, retry]
+            result = parse_courses_exp(i, e_id)
+            if not result[2]:
+                return result
+        return result
 
     retry = True
+    result = None
     while retry:
-        expr, msg, succeeded, retry = elect_course(exp, e_id)
+        result = elect_course(exp, e_id)
+        expr, msg, succeeded, retry = result
         print(f'{expr}: {msg} (succeeded:{succeeded}, retry:{retry})')
-        sleep(interval)
-    return elect_course(exp, e_id)
+        if retry:
+            sleep(interval)
+    return result
 
 
 def thread_elect_courses_exps(exps: list[str], e_id: str):
@@ -191,7 +199,10 @@ if __name__ == '__main__':
 
     if os.path.exists('cookies.txt'):
         with open('cookies.txt', 'r') as f:
-            cookies = {i.split('=')[0]: i.split('=')[1] for i in f.read().split(';')}
+            cookies = {
+                i.split('=')[0]: i.split('=')[1]
+                for i in f.read().split(';')
+            }
         ids = IdsAuth(cookies)
     elif os.path.exists('cookies.json'):
         with open('cookies.json', 'r') as f:
@@ -253,8 +264,8 @@ if __name__ == '__main__':
             df.to_csv(f'{election_id}.tsv', sep='\t', index=False)
         elif sheet_format == 'xlsx':
             df.to_excel(f'{election_id}.xlsx', index=False)
-    print(f'Please checkout full information on website' +
-          (' or in the file.' if sheet_format else '.'))
+    msg_suffix = ' or in the file.' if sheet_format else '.'
+    print('Please checkout full information on website' + msg_suffix)
 
     print('Courses: ')
     column_keys = ['id', 'no', 'name', 'teachers']
